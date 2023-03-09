@@ -1,0 +1,78 @@
+const puppeteer = require('puppeteer');
+const product = 'iphone 13';
+
+(async () => {
+  // Launch browser and go to Shopee
+  const browser = await puppeteer.launch();
+  const shopeepage = await browser.newPage();
+  await shopeepage.goto(`https://shopee.com.my/search?keyword=${product}`, { timeout: 120000 });
+
+  // Get the product details from Shopee
+  const shopeeProducts = await shopeepage.evaluate(() => {
+    const products = [];
+
+    document.querySelectorAll('[data-sqe="item"]').forEach((product) => {
+        const nameElement = product.querySelector('[data-sqe="name"]');
+        const priceElement = product.querySelector('.hpDKMN');
+        const linkElement = product.querySelector('a');
+        if (nameElement && priceElement && linkElement) {
+          const name = nameElement.textContent;
+          const price = priceElement.textContent.replace(/RM|,/g, '');
+          const link = `https://shopee.com.my${linkElement.getAttribute('href')}`;
+          products.push({
+            website: 'Shopee',
+            name,
+            price,
+            link,
+          });
+        }
+      });
+      
+
+    return products;
+  });
+
+  const lazadapage = await browser.newPage();
+  await lazadapage.goto('https://www.lazada.com.my/', { timeout: 120000 });
+
+  // Search for the product and click search button
+  const searchInput = await lazadapage.$('#q');
+  await searchInput.type('iphone 13');
+  const searchButton = await lazadapage.$('.search-box__button--1oH7');
+  await searchButton.click();
+  await lazadapage.waitForNavigation({ waitUntil: 'networkidle2' });
+
+  // Get the product details from Lazada
+  const lazadaProducts = await lazadapage.evaluate(() => {
+    const products = [];
+
+    document.querySelectorAll('.Bm3ON').forEach((product) => {
+      const name = product.querySelector('.RfADt').textContent;
+      const price = product.querySelector('.ooOxS').textContent.replace(/RM|,/g, '');
+      const link = product.querySelector('div._95X4G > a').getAttribute('href');
+      products.push({
+        website: 'Lazada',
+        name,
+        price: parseFloat(price),
+        link,
+      });
+    });
+
+    return products;
+  });
+
+  const allProducts = [...lazadaProducts, ...shopeeProducts];
+  allProducts.sort((a, b) => a.price - b.price);
+  // Output the results
+  console.log('Results:');
+  allProducts.forEach((product) => {
+    console.log(`Website: ${product.website}`);
+    console.log(`Product: ${product.name}`);
+    console.log(`Price: RM${product.price}`);
+    console.log(`Link: ${product.link}`);
+    console.log('------------------------');
+  });
+
+  // Close the browser
+  await browser.close();
+})();
